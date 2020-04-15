@@ -20,7 +20,7 @@
 #include "skierbehavior.h"
 #include "cablecarbehavior.h"
 
-constexpr unsigned int NB_SKIERS = 5;
+constexpr unsigned int NB_SKIERS = 15;
 constexpr unsigned int CABLE_CAR_CAPACITY = 5;
 
 int main()

@@ -123,9 +123,13 @@ protected:
 
     // A vous d'ajouter les attributs dont vous avez besoin
 
-    PcoSemaphore nbSkiersWaitingSem = PcoSemaphore(1);
-    PcoSemaphore waitInsideCalbeCarSem = PcoSemaphore(0);
-    PcoSemaphore waitOutsideCableCarSem = PcoSemaphore(0);
+    /*!
+     * \brief gère le nombre de skier en queue (en bas)
+     */
+    unsigned int nbSkiersInQueue = 0;
+
+    //Sempahores
+    PcoSemaphore fifo, mutex, waitInside, waitOutside, waitSkiers;
 
 };
 

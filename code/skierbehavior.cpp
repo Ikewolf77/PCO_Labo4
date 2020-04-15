@@ -19,11 +19,13 @@ void SkierBehavior::run()
 {
     // A vous d'ajouter le comportement du skieur
     while(cableCar->isInService()){
-        cableCar->waitForCableCar(id);
-        cableCar->goIn(id);
-        cableCar->waitInsideCableCar(id);
-        cableCar->goOut(id);
-        goDownTheMountain();
+        cableCar->waitForCableCar(id);        
+        if(cableCar->isInService()){ //Terminaison correcte, pour les gens qui attendent pour rien
+            cableCar->goIn(id);
+            cableCar->waitInsideCableCar(id);
+            cableCar->goOut(id);
+            goDownTheMountain();
+        }
     }
 }
 

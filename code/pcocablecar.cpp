@@ -16,7 +16,8 @@ constexpr unsigned int SECOND_IN_MICROSECONDS = 1000000;
 
 // A vous de remplir les méthodes ci-dessous
 
-PcoCableCar::PcoCableCar(const unsigned int capacity) : capacity(capacity)
+PcoCableCar::PcoCableCar(const unsigned int capacity) : capacity(capacity), fifo(PcoSemaphore(capacity)), mutex(PcoSemaphore(1)),
+                                                        waitInside(PcoSemaphore(0)), waitOutside(PcoSemaphore(0)), waitSkiers((0))
 {
 
 }
@@ -28,24 +29,42 @@ PcoCableCar::~PcoCableCar()
 
 void PcoCableCar::waitForCableCar(int id)
 {
-    nbSkiersWaitingSem.acquire();
-    ++nbSkiersWaiting;
-    nbSkiersWaitingSem.release();
+    //se met dans la queue
+    mutex.acquire();
+    ++nbSkiersInQueue;
+    mutex.release();
+    fifo.acquire();
+
+    //set met dans le prochain groupe de personne qui prend la télécabine
+    mutex.acquire();
+    if(inService){ //Gère la terminaison
+        ++nbSkiersWaiting;
+        --nbSkiersInQueue;
+        mutex.release();
+        qDebug() << "Skieur" << id << "attend la télécabine";
+        waitOutside.acquire(); //Attend le CableCar
+    } else {
+        mutex.release();
+    }
 }
 
 void PcoCableCar::waitInsideCableCar(int id)
 {
-    qDebug() << "Skieu" << id << "est dans la télécabine";
+    qDebug() << "Skieur" << id << "est dans la télécabine";
+    waitSkiers.release(); //dit à la télécabine que le skieur est dedans
+    waitInside.acquire(); //attend l'ouverture des portes pour descendre
 }
 
 void PcoCableCar::goIn(int id)
 {
-    waitOutsideCableCarSem.acquire();
+    qDebug() << "Skieur" << id << "monte dans la télécabine";
+    fifo.release(); //on peut faire attendre une autre personne
 }
 
 void PcoCableCar::goOut(int id)
 {
-    waitInsideCalbeCarSem.acquire();
+    qDebug() << "Skieur" << id << "sort dans la télécabine";
+    waitSkiers.release(); //dit à la télécabine que je suis sortit
 }
 
 bool PcoCableCar::isInService()
@@ -55,7 +74,18 @@ bool PcoCableCar::isInService()
 
 void PcoCableCar::endService()
 {
+    mutex.acquire();
+
     inService = false;
+
+    //relache les gens qui attendent à la fin du service
+    for(unsigned i = 0; i < nbSkiersWaiting; ++i)
+        waitOutside.release();
+
+    for(unsigned i = 0; i < nbSkiersInQueue; ++i)
+        fifo.release();
+
+    mutex.release();
 }
 
 void PcoCableCar::goUp()
@@ -72,19 +102,35 @@ void PcoCableCar::goDown()
 
 void PcoCableCar::loadSkiers()
 {
-    nbSkiersWaitingSem.acquire();
-    for(unsigned i = 0; i < nbSkiersWaiting && i < capacity; ++i){
-        waitOutsideCableCarSem.release();
-        --nbSkiersWaiting;
+    mutex.acquire();
+
+    qDebug() << "La télécabine embarque" << nbSkiersWaiting << "skieurs";
+
+    //on fait en 2 fois, histoire d'éviter d'attendre les skieurs 1 par 1
+    for(unsigned i = 0; i < nbSkiersWaiting; ++i){
+        waitOutside.release();
+    }
+
+    for(unsigned i = 0; i < nbSkiersWaiting; ++i){
+        waitSkiers.acquire();
         ++nbSkiersInside;
     }
-    nbSkiersWaitingSem.release();
+
+    nbSkiersWaiting = 0;
+    mutex.release();
 }
 
 void PcoCableCar::unloadSkiers()
 {
+
+    qDebug() << "La télécabine débarque les skieurs";
+
+    //on fait en 2 fois, histoire d'éviter d'attendre les skieurs 1 par 1
     for(unsigned i = 0; i < nbSkiersInside; ++i)
-        waitInsideCalbeCarSem.release();
+        waitInside.release();
+
+    for(unsigned i = 0; i < nbSkiersInside; ++i)
+        waitSkiers.acquire();
 
     nbSkiersInside = 0;
 }
