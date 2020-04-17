@@ -3,14 +3,15 @@
 //  / ___/ /__/ /_/ / / __// // / __// // / //
 // /_/   \___/\____/ /____/\___/____/\___/  //
 //                                          //
-// Auteurs : Mattei Simon, Kot Chau Ying
+// Auteurs : Prénom Nom, Prénom Nom
 
 #include "cablecarbehavior.h"
 
+#include <iostream>
+
 void CableCarBehavior::run()
 {
-    // A vous d'ajouter le comportement du télécabine
-    while(cableCar->isInService()){
+    while (cableCar->isInService()) {
         cableCar->loadSkiers();
         cableCar->goUp();
         cableCar->unloadSkiers();

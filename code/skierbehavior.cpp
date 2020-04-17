@@ -3,11 +3,14 @@
 //  / ___/ /__/ /_/ / / __// // / __// // / //
 // /_/   \___/\____/ /____/\___/____/\___/  //
 //                                          //
-// Auteurs : Mattei Simon, Kot Chau Ying
+// Auteurs : Prénom Nom, Prénom Nom
 
 #include "skierbehavior.h"
 
 #include <QRandomGenerator>
+
+#include <iostream>
+
 
 constexpr unsigned int MIN_SECONDS_DELAY = 2;
 constexpr unsigned int MAX_SECONDS_DELAY = 10;
@@ -19,8 +22,9 @@ void SkierBehavior::run()
 {
     // A vous d'ajouter le comportement du skieur
     while(cableCar->isInService()){
-        cableCar->waitForCableCar(id);        
-        if(cableCar->isInService()){ //Terminaison correcte, pour les gens qui attendent pour rien
+        cableCar->waitForCableCar(id);
+        // Si il n'est plus en service, l'étape après l'attente est la sortie de méthode
+        if(cableCar->isInService()){
             cableCar->goIn(id);
             cableCar->waitInsideCableCar(id);
             cableCar->goOut(id);

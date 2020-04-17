@@ -9,7 +9,7 @@
 // avant vos lancements etc. pour effectuer des tests.
 //
 // Modifications :
-// Auteurs : Mattei Simon, Kot Chau Ying
+// Auteurs : Prénom Nom, Prénom Nom
 
 #include <QDebug>
 
@@ -20,7 +20,7 @@
 #include "skierbehavior.h"
 #include "cablecarbehavior.h"
 
-constexpr unsigned int NB_SKIERS = 15;
+constexpr unsigned int NB_SKIERS = 10;
 constexpr unsigned int CABLE_CAR_CAPACITY = 5;
 
 int main()

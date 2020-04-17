@@ -3,13 +3,14 @@
 //  / ___/ /__/ /_/ / / __// // / __// // / //
 // /_/   \___/\____/ /____/\___/____/\___/  //
 //                                          //
-// Auteurs : Mattei Simon, Kot Chau Ying
+// Auteurs : Prénom Nom, Prénom Nom
 
 #ifndef PCOCABLECAR_H
 #define PCOCABLECAR_H
 
 #include "cablecar.h"
 #include <pcosynchro/pcosemaphore.h>
+#include <queue>
 
 /*!
  * \brief La classe PcoCableCar implémente la classe abstraite CableCar, la classe PcoCableCar
@@ -123,14 +124,18 @@ protected:
 
     // A vous d'ajouter les attributs dont vous avez besoin
 
-    /*!
-     * \brief gère le nombre de skier en queue (en bas)
-     */
-    unsigned int nbSkiersInQueue = 0;
+    std::queue<int> skierIdWaitingOutside ;
 
-    //Sempahores
-    PcoSemaphore fifo, mutex, waitInside, waitOutside, waitSkiers;
+    std::queue<int> skierIdInCabin;
 
-};
+    PcoSemaphore inCabinMutex;
+    PcoSemaphore waitingMutex;
+
+    PcoSemaphore load;
+    PcoSemaphore canGo;
+    PcoSemaphore unload;
+
+
+};  
 
 #endif // PCOCABLECAR_H

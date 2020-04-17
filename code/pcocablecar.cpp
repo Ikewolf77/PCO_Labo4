@@ -3,68 +3,75 @@
 //  / ___/ /__/ /_/ / / __// // / __// // / //
 // /_/   \___/\____/ /____/\___/____/\___/  //
 //                                          //
-// Auteurs : Mattei Simon, Kot Chau Ying
+// Auteurs : Prénom Nom, Prénom Nom
 
 #include "pcocablecar.h"
 #include <pcosynchro/pcothread.h>
 
 #include <QDebug>
 #include <QRandomGenerator>
+#include <iostream>
+
+
 constexpr unsigned int MIN_SECONDS_DELAY = 1;
 constexpr unsigned int MAX_SECONDS_DELAY = 5;
 constexpr unsigned int SECOND_IN_MICROSECONDS = 1000000;
 
 // A vous de remplir les méthodes ci-dessous
 
-PcoCableCar::PcoCableCar(const unsigned int capacity) : capacity(capacity), fifo(PcoSemaphore(capacity)), mutex(PcoSemaphore(1)),
-                                                        waitInside(PcoSemaphore(0)), waitOutside(PcoSemaphore(0)), waitSkiers((0))
+PcoCableCar::PcoCableCar(const unsigned int capacity) : capacity(capacity),
+                                                        inCabinMutex(1),
+                                                        waitingMutex(1),
+                                                        load(0),
+                                                        canGo(0),
+                                                        unload(0)
 {
-
 }
 
 PcoCableCar::~PcoCableCar()
 {
-
 }
 
 void PcoCableCar::waitForCableCar(int id)
 {
-    //se met dans la queue
-    mutex.acquire();
-    ++nbSkiersInQueue;
-    mutex.release();
-    fifo.acquire();
+    // Increment le nombre de skier en attente
+    waitingMutex.acquire();
+    nbSkiersWaiting++;
+    waitingMutex.release();
+    qDebug() << "Skier "<< id << " attend la cabine";
 
-    //set met dans le prochain groupe de personne qui prend la télécabine
-    mutex.acquire();
-    if(inService){ //Gère la terminaison
-        ++nbSkiersWaiting;
-        --nbSkiersInQueue;
-        mutex.release();
-        qDebug() << "Skieur" << id << "attend la télécabine";
-        waitOutside.acquire(); //Attend le CableCar
-    } else {
-        mutex.release();
-    }
+
+    // Attends que la cabine permet au skier de monter
+    load.acquire();
+
 }
 
 void PcoCableCar::waitInsideCableCar(int id)
 {
-    qDebug() << "Skieur" << id << "est dans la télécabine";
-    waitSkiers.release(); //dit à la télécabine que le skieur est dedans
-    waitInside.acquire(); //attend l'ouverture des portes pour descendre
+   qDebug() << "Skier " << id << " attend dans la cabine" ;
+
+   // Indique qu'on à la cabine qu'un skier est monté
+   canGo.release();
+
+   // Attends le départ de la cabine
+   unload.acquire();
+
 }
 
 void PcoCableCar::goIn(int id)
 {
-    qDebug() << "Skieur" << id << "monte dans la télécabine";
-    fifo.release(); //on peut faire attendre une autre personne
+
+    qDebug() << "Skier " << id << " entre dans la cabine";
+
 }
 
 void PcoCableCar::goOut(int id)
 {
-    qDebug() << "Skieur" << id << "sort dans la télécabine";
-    waitSkiers.release(); //dit à la télécabine que je suis sortit
+
+    qDebug() << "Skier " << id << " sort de la cabine";
+
+    // Indique qu'un skier est sorti
+    canGo.release();
 }
 
 bool PcoCableCar::isInService()
@@ -74,63 +81,76 @@ bool PcoCableCar::isInService()
 
 void PcoCableCar::endService()
 {
-    mutex.acquire();
-
     inService = false;
-
-    //relache les gens qui attendent à la fin du service
-    for(unsigned i = 0; i < nbSkiersWaiting; ++i)
-        waitOutside.release();
-
-    for(unsigned i = 0; i < nbSkiersInQueue; ++i)
-        fifo.release();
-
-    mutex.release();
+    // Fin du server, on relache les personnes en attente
+    for(unsigned i = 0; i < nbSkiersWaiting;++i){
+        load.release();
+    }
 }
 
 void PcoCableCar::goUp()
 {
-    qDebug() << "La télécabine monte";
+    qDebug() << "Le télécabine monte";
     PcoThread::usleep((MIN_SECONDS_DELAY + QRandomGenerator::system()->bounded(MAX_SECONDS_DELAY + 1)) * SECOND_IN_MICROSECONDS);
 }
 
 void PcoCableCar::goDown()
 {
-    qDebug() << "La télécabine descend";
+    qDebug() << "Le télécabine descend";
     PcoThread::usleep((MIN_SECONDS_DELAY + QRandomGenerator::system()->bounded(MAX_SECONDS_DELAY + 1)) * SECOND_IN_MICROSECONDS);
 }
 
 void PcoCableCar::loadSkiers()
 {
-    mutex.acquire();
+    // Permet de load uniquement si c'est en service
+    if(inService){
+        qDebug() << "La télécabine charge les skiers";
 
-    qDebug() << "La télécabine embarque" << nbSkiersWaiting << "skieurs";
+        // Regarde le nombre de personne qui doit monté
+        unsigned nbCanGo = nbSkiersWaiting < capacity ? nbSkiersInside : capacity;
 
-    //on fait en 2 fois, histoire d'éviter d'attendre les skieurs 1 par 1
-    for(unsigned i = 0; i < nbSkiersWaiting; ++i){
-        waitOutside.release();
+        // Laisse les skier monter
+        for(unsigned i = 0 ; i < nbCanGo; ++i){
+            load.release();
+
+            // Diminue le nombre de personne en attente
+            // On ne soustrait pas à la fin pour être le plus fidèle possible au modéle
+            waitingMutex.acquire();
+            nbSkiersWaiting--;
+            waitingMutex.release();
+
+            // Incrémente le nombre de personne dans la cabine
+            inCabinMutex.acquire();
+            nbSkiersInside++;
+            inCabinMutex.release();
+        }
+
+        // Donne le signale que la cabine démarre
+        for(unsigned i = 0; i < nbCanGo; ++i){
+            canGo.acquire();
+        }
     }
-
-    for(unsigned i = 0; i < nbSkiersWaiting; ++i){
-        waitSkiers.acquire();
-        ++nbSkiersInside;
-    }
-
-    nbSkiersWaiting = 0;
-    mutex.release();
 }
 
 void PcoCableCar::unloadSkiers()
 {
+    qDebug() << "La télécabine décharge les skiers";
 
-    qDebug() << "La télécabine débarque les skieurs";
+    unsigned insideTemp = nbSkiersInside;
 
-    //on fait en 2 fois, histoire d'éviter d'attendre les skieurs 1 par 1
-    for(unsigned i = 0; i < nbSkiersInside; ++i)
-        waitInside.release();
+    // Laisse les skiers sortir
+    for(unsigned i = 0; i < insideTemp; ++i){
+        unload.release();
 
-    for(unsigned i = 0; i < nbSkiersInside; ++i)
-        waitSkiers.acquire();
+        inCabinMutex.acquire();
+        --nbSkiersInside;
+        inCabinMutex.release();
+    }
 
-    nbSkiersInside = 0;
+    // Attent que tout le monde sort
+    for(unsigned i = 0; i < insideTemp ; ++i){
+       canGo.acquire();
+    }
+
+
 }
